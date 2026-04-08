@@ -12,7 +12,7 @@ import MainLayout from "@/components/layout/MainLayout";
 import TrackCard from "@/components/track/TrackCard";
 import { supabase } from "@/lib/supabase";
 import { usePlayerStore } from "@/stores/playerStore";
-import type { Track } from "@/types/track";
+import type { Track, PlayableItem } from "@/types/track";
 import { formatTime } from "@/lib/formatTime";
 
 type DbTrack = {
@@ -114,10 +114,13 @@ function buildPlaylistData(data: PlaylistRow): PlaylistData {
   };
 }
 
-function areTrackListsEqual(a: Track[], b: Track[]) {
+function areTrackListsEqual(a: PlayableItem[], b: Track[]): boolean {
   if (a.length !== b.length) return false;
 
-  return a.every((track, index) => track.id === b[index]?.id);
+  return a.every((item, index) => {
+    if (item.type !== "track") return false;
+    return item.id === b[index]?.id;
+  });
 }
 
 export default function PlaylistDetailPage() {
@@ -329,15 +332,14 @@ export default function PlaylistDetailPage() {
 
     const refreshedPlaylist = await fetchPlaylist();
 
-    if (shouldSyncPlayerQueue && refreshedPlaylist) {
-      setQueue(refreshedPlaylist.tracks);
-    }
-
-    setToastMessage(
-      reindexed
-        ? "Canción quitada de la playlist."
-        : "Se quitó la canción, pero hubo un problema reordenando."
-    );
+ if (shouldSyncPlayerQueue && refreshedPlaylist) {
+  setQueue(
+    refreshedPlaylist.tracks.map((track) => ({
+      ...track,
+      type: "track" as const,
+    }))
+  );
+}
   };
 
   const swapTrackPositions = async (
@@ -423,9 +425,14 @@ export default function PlaylistDetailPage() {
     const refreshedPlaylist = await fetchPlaylist();
 
     if (shouldSyncPlayerQueue && refreshedPlaylist) {
-      setQueue(refreshedPlaylist.tracks);
+      setQueue(
+        refreshedPlaylist.tracks.map((track) => ({
+          ...track,
+          type: "track" as const,
+        }))
+      );
     }
-
+  
     setToastMessage("Playlist reordenada.");
   };
 
@@ -445,7 +452,10 @@ export default function PlaylistDetailPage() {
 
   const handlePlayPlaylist = () => {
     if (!playlist || playlist.tracks.length === 0) return;
-    setTrack(playlist.tracks[0], playlist.tracks);
+    setTrack(
+      { ...playlist.tracks[0], type: "track" },
+      playlist.tracks.map((track) => ({ ...track, type: "track" }))
+    );
   };
 
   const handleStartEditTitle = () => {

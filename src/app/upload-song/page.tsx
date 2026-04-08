@@ -3,7 +3,6 @@
 import { FormEvent, useState } from "react";
 import MainLayout from "@/components/layout/MainLayout";
 import { supabase } from "@/lib/supabase";
-
 function sanitizeFileName(fileName: string) {
   return fileName
     .normalize("NFD")

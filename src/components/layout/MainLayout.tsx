@@ -26,7 +26,11 @@ export default function MainLayout({ children }: MainLayoutProps) {
   return (
     <div className="h-screen overflow-hidden bg-black text-white">
       <div className="flex h-[calc(100vh-104px)] flex-col gap-2 p-2 md:flex-row">
-        <Sidebar />
+        {mounted ? (
+          <Sidebar />
+        ) : (
+          <div className="hidden w-[280px] rounded-2xl bg-zinc-950 md:block" />
+        )}
 
         <main className="relative flex-1 overflow-y-auto overflow-x-hidden rounded-2xl bg-black">
           <div

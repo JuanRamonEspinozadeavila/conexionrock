@@ -3,7 +3,6 @@
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-import MainLayout from "@/components/layout/MainLayout";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -28,7 +27,9 @@ export default function LoginPage() {
 
         if (error) throw error;
 
-        setMessage("Cuenta creada. Revisa tu correo si Supabase pide confirmación.");
+        setMessage(
+          "Cuenta creada. Revisa tu correo si Supabase pide confirmación."
+        );
       } else {
         const { error } = await supabase.auth.signInWithPassword({
           email,
@@ -39,17 +40,20 @@ export default function LoginPage() {
 
         setMessage("Inicio de sesión correcto.");
         router.push("/home");
+        router.refresh();
       }
-    } catch (error: any) {
-      setMessage(error.message || "Ocurrió un error.");
+    } catch (error) {
+      setMessage(
+        error instanceof Error ? error.message : "Ocurrió un error."
+      );
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <MainLayout>
-      <div className="mx-auto max-w-md rounded-3xl border border-white/10 bg-zinc-900 p-6 text-white shadow-2xl">
+    <main className="flex min-h-screen items-center justify-center bg-black px-4">
+      <div className="w-full max-w-md rounded-3xl border border-white/10 bg-zinc-900 p-6 text-white shadow-2xl">
         <p className="mb-2 text-xs uppercase tracking-[0.3em] text-zinc-500">
           Acceso
         </p>
@@ -67,18 +71,24 @@ export default function LoginPage() {
               onChange={(e) => setEmail(e.target.value)}
               className="w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-white outline-none transition focus:border-white/30"
               placeholder="tuemail@correo.com"
+              autoComplete="email"
               required
             />
           </div>
 
           <div>
-            <label className="mb-2 block text-sm text-zinc-300">Contraseña</label>
+            <label className="mb-2 block text-sm text-zinc-300">
+              Contraseña
+            </label>
             <input
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className="w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-white outline-none transition focus:border-white/30"
               placeholder="********"
+              autoComplete={
+                mode === "login" ? "current-password" : "new-password"
+              }
               required
             />
           </div>
@@ -91,18 +101,19 @@ export default function LoginPage() {
             {loading
               ? "Procesando..."
               : mode === "login"
-              ? "Entrar"
-              : "Crear cuenta"}
+                ? "Entrar"
+                : "Crear cuenta"}
           </button>
         </form>
 
-        {message && (
+        {message ? (
           <p className="mt-4 rounded-xl bg-black/30 p-3 text-sm text-zinc-300">
             {message}
           </p>
-        )}
+        ) : null}
 
         <button
+          type="button"
           onClick={() =>
             setMode((prev) => (prev === "login" ? "register" : "login"))
           }
@@ -113,6 +124,6 @@ export default function LoginPage() {
             : "¿Ya tienes cuenta? Iniciar sesión"}
         </button>
       </div>
-    </MainLayout>
+    </main>
   );
 }
