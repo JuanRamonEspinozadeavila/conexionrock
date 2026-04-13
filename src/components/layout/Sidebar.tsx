@@ -14,11 +14,19 @@ import {
   Music2,
   Mic2,
   Upload,
+  LogIn,
 } from "lucide-react";
 import { useLibraryStore } from "@/stores/libraryStore";
 import { playlists } from "@/data/playlists";
+import { supabase } from "@/lib/supabase";
 
-const navItems = [
+type NavItem = {
+  label: string;
+  href: string;
+  icon: typeof House;
+};
+
+const publicNavItems: NavItem[] = [
   {
     label: "Inicio",
     href: "/home",
@@ -30,6 +38,14 @@ const navItems = [
     icon: Search,
   },
   {
+    label: "Podcasts",
+    href: "/podcasts",
+    icon: Mic2,
+  },
+];
+
+const privateNavItems: NavItem[] = [
+  {
     label: "Tu biblioteca",
     href: "/library",
     icon: Library,
@@ -38,11 +54,6 @@ const navItems = [
     label: "Mis playlists",
     href: "/library?tab=playlists",
     icon: ListMusic,
-  },
-  {
-    label: "Podcasts",
-    href: "/podcasts",
-    icon: Mic2,
   },
 ];
 
@@ -53,16 +64,52 @@ export default function Sidebar() {
 
   const [isOpen, setIsOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
 
   const { savedTracks, hasHydrated } = useLibraryStore();
 
   useEffect(() => {
+    let isActive = true;
+
     setMounted(true);
 
     if (!useLibraryStore.persist.hasHydrated()) {
       useLibraryStore.persist.rehydrate();
     }
+
+    const loadUser = async () => {
+      const { data, error } = await supabase.auth.getUser();
+
+      if (!isActive) return;
+
+      if (error || !data.user) {
+        setIsAuthenticated(false);
+        return;
+      }
+
+      setIsAuthenticated(true);
+    };
+
+    loadUser();
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setIsAuthenticated(!!session?.user);
+    });
+
+    return () => {
+      isActive = false;
+      subscription.unsubscribe();
+    };
   }, []);
+
+  const isGuest = isAuthenticated === false;
+  const isLoggedIn = isAuthenticated === true;
+
+  const navItems = isLoggedIn
+    ? [...publicNavItems, ...privateNavItems]
+    : publicNavItems;
 
   const favoriteCount = mounted && hasHydrated ? savedTracks.length : 0;
   const playlistCount = playlists.length;
@@ -76,24 +123,35 @@ export default function Sidebar() {
     .slice(0, 3)
     .map((playlist) => playlist.coverUrl);
 
-  const collectionItems = [
-    {
-      label: "Tus favoritas",
-      href: "/liked",
-      icon: Heart,
-      meta: `${favoriteCount} canción${favoriteCount === 1 ? "" : "es"}`,
-      previews: favoritePreviews,
-      fallbackType: "favorites" as const,
-    },
-    {
-      label: "Playlists destacadas",
-      href: "/home#playlists",
-      icon: ListMusic,
-      meta: `${playlistCount} playlist${playlistCount === 1 ? "" : "s"}`,
-      previews: playlistPreviews,
-      fallbackType: "playlist" as const,
-    },
-  ];
+  const collectionItems = isLoggedIn
+    ? [
+        {
+          label: "Tus favoritas",
+          href: "/liked",
+          icon: Heart,
+          meta: `${favoriteCount} canción${favoriteCount === 1 ? "" : "es"}`,
+          previews: favoritePreviews,
+          fallbackType: "favorites" as const,
+        },
+        {
+          label: "Playlists destacadas",
+          href: "/#playlists",
+          icon: ListMusic,
+          meta: `${playlistCount} playlist${playlistCount === 1 ? "" : "s"}`,
+          previews: playlistPreviews,
+          fallbackType: "playlist" as const,
+        },
+      ]
+    : [
+        {
+          label: "Playlists destacadas",
+          href: "/#playlists",
+          icon: ListMusic,
+          meta: `${playlistCount} playlist${playlistCount === 1 ? "" : "s"}`,
+          previews: playlistPreviews,
+          fallbackType: "playlist" as const,
+        },
+      ];
 
   const renderPreviewStack = (
     previews: string[],
@@ -133,21 +191,28 @@ export default function Sidebar() {
     );
   };
 
+  const isLinkActive = (href: string) => {
+    if (href === "/") {
+      return pathname === "/";
+    }
+
+    if (href === "/library") {
+      return pathname === "/library" && currentTab !== "playlists";
+    }
+
+    if (href === "/library?tab=playlists") {
+      return pathname === "/library" && currentTab === "playlists";
+    }
+
+    return pathname === href;
+  };
+
   const renderSidebarContent = (isMobile = false) => (
     <>
       <nav className="space-y-2">
         {navItems.map((item) => {
           const Icon = item.icon;
-
-          let isActive = false;
-
-          if (item.href === "/library") {
-            isActive = pathname === "/library" && currentTab !== "playlists";
-          } else if (item.href === "/library?tab=playlists") {
-            isActive = pathname === "/library" && currentTab === "playlists";
-          } else {
-            isActive = pathname === item.href;
-          }
+          const isActive = isLinkActive(item.href);
 
           return (
             <Link
@@ -167,25 +232,48 @@ export default function Sidebar() {
         })}
       </nav>
 
-  <div className="mt-4 space-y-3">
-  <Link
-    href="/upload-song"
-    onClick={isMobile ? () => setIsOpen(false) : undefined}
-    className="flex items-center justify-center gap-2 rounded-full bg-zinc-800 px-4 py-3 text-sm font-semibold text-white transition hover:bg-zinc-700"
-  >
-    <Upload size={16} />
-    <span>Subir canción</span>
-  </Link>
+      <div className="mt-4 space-y-3">
+        {isLoggedIn ? (
+          <>
+            <Link
+              href="/upload-song"
+              onClick={isMobile ? () => setIsOpen(false) : undefined}
+              className="flex items-center justify-center gap-2 rounded-full bg-zinc-800 px-4 py-3 text-sm font-semibold text-white transition hover:bg-zinc-700"
+            >
+              <Upload size={16} />
+              <span>Subir canción</span>
+            </Link>
 
-  <Link
-    href="/upload-podcast"
-    onClick={isMobile ? () => setIsOpen(false) : undefined}
-    className="flex items-center justify-center gap-2 rounded-full border border-white/15 px-4 py-3 text-sm font-semibold text-white transition hover:bg-white/10"
-  >
-    <Mic2 size={16} />
-    <span>Subir podcast</span>
-  </Link>
-</div>
+            <Link
+              href="/upload-podcast"
+              onClick={isMobile ? () => setIsOpen(false) : undefined}
+              className="flex items-center justify-center gap-2 rounded-full border border-white/15 px-4 py-3 text-sm font-semibold text-white transition hover:bg-white/10"
+            >
+              <Mic2 size={16} />
+              <span>Subir podcast</span>
+            </Link>
+          </>
+        ) : (
+          <>
+            <div className="rounded-2xl border border-white/10 bg-zinc-900/80 p-4">
+              <p className="text-sm font-semibold text-white">Modo invitado</p>
+              <p className="mt-1 text-xs leading-5 text-zinc-400">
+                Puedes explorar la app, pero para guardar favoritos, crear
+                playlists o subir contenido necesitas iniciar sesión.
+              </p>
+            </div>
+
+            <Link
+              href="/login"
+              onClick={isMobile ? () => setIsOpen(false) : undefined}
+              className="flex items-center justify-center gap-2 rounded-full bg-zinc-800 px-4 py-3 text-sm font-semibold text-white transition hover:bg-zinc-700"
+            >
+              <LogIn size={16} />
+              <span>Iniciar sesión</span>
+            </Link>
+          </>
+        )}
+      </div>
 
       <div className={isMobile ? "mt-8" : "mt-6"}>
         <div className="mb-3 flex items-center justify-between">

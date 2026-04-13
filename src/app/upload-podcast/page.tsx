@@ -1,6 +1,7 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import MainLayout from "@/components/layout/MainLayout";
 import { supabase } from "@/lib/supabase";
 
@@ -19,6 +20,12 @@ type PodcastOption = {
 };
 
 export default function UploadPodcastPage() {
+  const router = useRouter();
+
+  const [mounted, setMounted] = useState(false);
+  const [authChecked, setAuthChecked] = useState(false);
+  const [userId, setUserId] = useState("");
+
   const [mode, setMode] = useState<"podcast" | "episode">("podcast");
 
   const [podcasts, setPodcasts] = useState<PodcastOption[]>([]);
@@ -40,22 +47,52 @@ export default function UploadPodcastPage() {
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
 
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (!mounted) return;
+
+    const checkAuth = async () => {
+      const {
+        data: { session },
+        error,
+      } = await supabase.auth.getSession();
+
+      if (error) {
+        setAuthChecked(true);
+        setMessage("Error obteniendo sesión.");
+        return;
+      }
+
+      const user = session?.user;
+
+      if (!user) {
+        setAuthChecked(true);
+        router.replace("/login");
+        return;
+      }
+
+      setUserId(user.id);
+      setAuthChecked(true);
+    };
+
+    void checkAuth();
+  }, [mounted, router]);
+
   const loadUserPodcasts = async () => {
     setLoadingPodcasts(true);
 
     try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-
-      if (!user) {
+      if (!userId) {
         throw new Error("Debes iniciar sesión.");
       }
 
       const { data, error } = await supabase
         .from("podcasts")
         .select("id, title")
-        .eq("user_id", user.id)
+        .eq("user_id", userId)
         .order("created_at", { ascending: false });
 
       if (error) throw error;
@@ -83,11 +120,7 @@ export default function UploadPodcastPage() {
     setMessage("");
 
     try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-
-      if (!user) {
+      if (!userId) {
         throw new Error("Debes iniciar sesión para crear un podcast.");
       }
 
@@ -95,7 +128,7 @@ export default function UploadPodcastPage() {
 
       if (podcastCoverFile) {
         const cleanCoverName = sanitizeFileName(podcastCoverFile.name);
-        const coverFileName = `${user.id}-${Date.now()}-${cleanCoverName}`;
+        const coverFileName = `${userId}-${Date.now()}-${cleanCoverName}`;
 
         const { error: coverError } = await supabase.storage
           .from("podcast-covers")
@@ -107,7 +140,7 @@ export default function UploadPodcastPage() {
       }
 
       const { error: insertError } = await supabase.from("podcasts").insert({
-        user_id: user.id,
+        user_id: userId,
         title: podcastTitle,
         author: podcastAuthor,
         description: podcastDescription || null,
@@ -121,6 +154,10 @@ export default function UploadPodcastPage() {
       setPodcastAuthor("");
       setPodcastDescription("");
       setPodcastCoverFile(null);
+
+      if (mode === "episode") {
+        await loadUserPodcasts();
+      }
     } catch (error: any) {
       setMessage(error.message || "Ocurrió un error al crear el podcast.");
     } finally {
@@ -134,11 +171,7 @@ export default function UploadPodcastPage() {
     setMessage("");
 
     try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-
-      if (!user) {
+      if (!userId) {
         throw new Error("Debes iniciar sesión para subir episodios.");
       }
 
@@ -151,7 +184,7 @@ export default function UploadPodcastPage() {
       }
 
       const cleanAudioName = sanitizeFileName(episodeAudioFile.name);
-      const audioFileName = `${user.id}-${Date.now()}-${cleanAudioName}`;
+      const audioFileName = `${userId}-${Date.now()}-${cleanAudioName}`;
 
       const { error: audioError } = await supabase.storage
         .from("podcast-audio")
@@ -163,7 +196,7 @@ export default function UploadPodcastPage() {
 
       if (episodeCoverFile) {
         const cleanCoverName = sanitizeFileName(episodeCoverFile.name);
-        const coverFileName = `${user.id}-${Date.now()}-${cleanCoverName}`;
+        const coverFileName = `${userId}-${Date.now()}-${cleanCoverName}`;
 
         const { error: coverError } = await supabase.storage
           .from("podcast-covers")
@@ -211,6 +244,16 @@ export default function UploadPodcastPage() {
       setLoading(false);
     }
   };
+
+  if (!mounted || !authChecked) {
+    return (
+      <MainLayout>
+        <div className="mx-auto max-w-2xl rounded-3xl border border-white/10 bg-zinc-900 p-6 text-zinc-300 shadow-2xl">
+          Cargando acceso...
+        </div>
+      </MainLayout>
+    );
+  }
 
   return (
     <MainLayout>

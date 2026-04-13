@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import MainLayout from "@/components/layout/MainLayout";
 import TrackCard from "@/components/track/TrackCard";
@@ -84,7 +85,10 @@ export default function LibraryPageClient({
 }: {
   initialTab: Tab;
 }) {
+  const router = useRouter();
+
   const [mounted, setMounted] = useState(false);
+  const [authChecked, setAuthChecked] = useState(false);
   const [tracks, setTracks] = useState<Track[]>([]);
   const [likedTracks, setLikedTracks] = useState<Track[]>([]);
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
@@ -114,6 +118,7 @@ export default function LibraryPageClient({
       if (sessionError) {
         console.error("Error obteniendo sesión:", sessionError.message);
         setMessage("Error obteniendo sesión");
+        setAuthChecked(true);
         setLoading(false);
         return;
       }
@@ -121,10 +126,13 @@ export default function LibraryPageClient({
       const user = sessionData.session?.user;
 
       if (!user) {
-        setMessage("No hay sesión activa");
+        setAuthChecked(true);
         setLoading(false);
+        router.replace("/login");
         return;
       }
+
+      setAuthChecked(true);
 
       const { data: uploadedData, error: uploadedError } = await supabase
         .from("tracks")
@@ -242,7 +250,7 @@ export default function LibraryPageClient({
     };
 
     fetchLibrary();
-  }, [mounted]);
+  }, [mounted, router]);
 
   const handleCreatePlaylist = async () => {
     const title = newPlaylistName.trim();
@@ -412,7 +420,15 @@ export default function LibraryPageClient({
     }
   };
 
-  if (!mounted) return null;
+  if (!mounted || !authChecked) {
+    return (
+      <MainLayout>
+        <div className="rounded-2xl bg-zinc-900 p-6 text-zinc-400">
+          Cargando tu biblioteca...
+        </div>
+      </MainLayout>
+    );
+  }
 
   const currentTracks =
     activeTab === "uploads"

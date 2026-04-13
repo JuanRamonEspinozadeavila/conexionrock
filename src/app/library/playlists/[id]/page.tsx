@@ -136,6 +136,7 @@ export default function PlaylistDetailPage() {
   const playerQueue = usePlayerStore((state) => state.queue);
 
   const [mounted, setMounted] = useState(false);
+  const [authChecked, setAuthChecked] = useState(false);
   const [userId, setUserId] = useState("");
   const [playlist, setPlaylist] = useState<PlaylistData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -155,6 +156,8 @@ export default function PlaylistDetailPage() {
   const fetchPlaylist = useCallback(async (): Promise<PlaylistData | null> => {
     if (!playlistId) {
       setMessage("Playlist no válida");
+      setPlaylist(null);
+      setAuthChecked(true);
       setLoading(false);
       return null;
     }
@@ -169,17 +172,20 @@ export default function PlaylistDetailPage() {
         console.error("Error obteniendo sesión:", sessionError.message);
         setMessage("Error obteniendo sesión");
         setPlaylist(null);
+        setAuthChecked(true);
         return null;
       }
 
       const user = sessionData.session?.user;
 
       if (!user) {
-        setMessage("No hay sesión activa");
-        setPlaylist(null);
+        setAuthChecked(true);
+        setLoading(false);
+        router.replace("/login");
         return null;
       }
 
+      setAuthChecked(true);
       setUserId(user.id);
 
       const { data, error } = await supabase
@@ -229,7 +235,7 @@ export default function PlaylistDetailPage() {
     } finally {
       setLoading(false);
     }
-  }, [playlistId]);
+  }, [playlistId, router]);
 
   useEffect(() => {
     if (!mounted || !playlistId) return;
@@ -328,18 +334,20 @@ export default function PlaylistDetailPage() {
       return;
     }
 
-    const reindexed = await reindexPlaylistPositions(selectedPlaylistId);
+    await reindexPlaylistPositions(selectedPlaylistId);
 
     const refreshedPlaylist = await fetchPlaylist();
 
- if (shouldSyncPlayerQueue && refreshedPlaylist) {
-  setQueue(
-    refreshedPlaylist.tracks.map((track) => ({
-      ...track,
-      type: "track" as const,
-    }))
-  );
-}
+    if (shouldSyncPlayerQueue && refreshedPlaylist) {
+      setQueue(
+        refreshedPlaylist.tracks.map((track) => ({
+          ...track,
+          type: "track" as const,
+        }))
+      );
+    }
+
+    setToastMessage("Canción quitada de la playlist.");
   };
 
   const swapTrackPositions = async (
@@ -432,7 +440,7 @@ export default function PlaylistDetailPage() {
         }))
       );
     }
-  
+
     setToastMessage("Playlist reordenada.");
   };
 
@@ -452,6 +460,7 @@ export default function PlaylistDetailPage() {
 
   const handlePlayPlaylist = () => {
     if (!playlist || playlist.tracks.length === 0) return;
+
     setTrack(
       { ...playlist.tracks[0], type: "track" },
       playlist.tracks.map((track) => ({ ...track, type: "track" }))
@@ -600,19 +609,27 @@ export default function PlaylistDetailPage() {
     e.target.value = "";
   };
 
-  if (!mounted) return null;
+  if (!mounted || !authChecked) {
+    return (
+      <MainLayout>
+        <div className="rounded-2xl bg-zinc-900 p-6 text-zinc-400">
+          Cargando playlist...
+        </div>
+      </MainLayout>
+    );
+  }
 
   const playlistCover =
     getPublicCoverUrl(playlist?.cover_url) ||
     playlist?.tracks[0]?.coverUrl ||
     "/placeholder-cover.jpg";
 
-
-
-const totalDurationInSeconds = playlist
-  ? playlist.tracks.reduce((acc, track) => acc + (Number(track.duration) || 0), 0)
-  : 0;
-
+  const totalDurationInSeconds = playlist
+    ? playlist.tracks.reduce(
+        (acc, track) => acc + (Number(track.duration) || 0),
+        0
+      )
+    : 0;
 
   return (
     <MainLayout>
@@ -702,9 +719,10 @@ const totalDurationInSeconds = playlist
                         {playlist.title}
                       </h1>
 
-                     <p className="mt-3 text-sm text-zinc-400">
-  {playlist.tracks.length} canciones · {formatTime(totalDurationInSeconds)}
-</p>
+                      <p className="mt-3 text-sm text-zinc-400">
+                        {playlist.tracks.length} canciones ·{" "}
+                        {formatTime(totalDurationInSeconds)}
+                      </p>
 
                       <div className="mt-6 flex flex-wrap gap-3">
                         <button
@@ -750,7 +768,6 @@ const totalDurationInSeconds = playlist
                     key={track.id}
                     track={track}
                     queue={playlist.tracks}
-                   
                     playlistId={playlist.id}
                     onRemoveFromPlaylist={handleRemoveFromPlaylist}
                     onMoveUp={handleMoveUp}

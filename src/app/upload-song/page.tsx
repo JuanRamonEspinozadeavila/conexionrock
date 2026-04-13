@@ -1,8 +1,10 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import MainLayout from "@/components/layout/MainLayout";
 import { supabase } from "@/lib/supabase";
+
 function sanitizeFileName(fileName: string) {
   return fileName
     .normalize("NFD")
@@ -11,13 +13,14 @@ function sanitizeFileName(fileName: string) {
     .replace(/-+/g, "-")
     .toLowerCase();
 }
-export default function UploadPage() 
 
+export default function UploadPage() {
+  const router = useRouter();
 
+  const [mounted, setMounted] = useState(false);
+  const [authChecked, setAuthChecked] = useState(false);
+  const [userId, setUserId] = useState("");
 
-
-
-{
   const [title, setTitle] = useState("");
   const [artist, setArtist] = useState("");
   const [audioFile, setAudioFile] = useState<File | null>(null);
@@ -25,17 +28,47 @@ export default function UploadPage()
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
 
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (!mounted) return;
+
+    const checkAuth = async () => {
+      const {
+        data: { session },
+        error,
+      } = await supabase.auth.getSession();
+
+      if (error) {
+        setAuthChecked(true);
+        setMessage("Error obteniendo sesión.");
+        return;
+      }
+
+      const user = session?.user;
+
+      if (!user) {
+        setAuthChecked(true);
+        router.replace("/login");
+        return;
+      }
+
+      setUserId(user.id);
+      setAuthChecked(true);
+    };
+
+    void checkAuth();
+  }, [mounted, router]);
+
   const handleUpload = async (e: FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setMessage("");
 
     try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-
-      if (!user) {
+      if (!userId) {
         throw new Error("Debes iniciar sesión para subir canciones.");
       }
 
@@ -44,12 +77,12 @@ export default function UploadPage()
       }
 
       const cleanAudioName = sanitizeFileName(audioFile.name);
-const cleanCoverName = coverFile ? sanitizeFileName(coverFile.name) : null;
+      const cleanCoverName = coverFile ? sanitizeFileName(coverFile.name) : null;
 
-const audioFileName = `${user.id}-${Date.now()}-${cleanAudioName}`;
-const coverFileName = cleanCoverName
-  ? `${user.id}-${Date.now()}-${cleanCoverName}`
-  : null;
+      const audioFileName = `${userId}-${Date.now()}-${cleanAudioName}`;
+      const coverFileName = cleanCoverName
+        ? `${userId}-${Date.now()}-${cleanCoverName}`
+        : null;
 
       const { error: audioError } = await supabase.storage
         .from("track-audio")
@@ -69,13 +102,11 @@ const coverFileName = cleanCoverName
         coverPath = coverFileName;
       }
 
-      const audioPath = audioFileName;
-
       const { error: insertError } = await supabase.from("tracks").insert({
-        user_id: user.id,
+        user_id: userId,
         title,
         artist,
-        audio_url: audioPath,
+        audio_url: audioFileName,
         cover_url: coverPath,
       });
 
@@ -92,6 +123,16 @@ const coverFileName = cleanCoverName
       setLoading(false);
     }
   };
+
+  if (!mounted || !authChecked) {
+    return (
+      <MainLayout>
+        <div className="mx-auto max-w-2xl rounded-3xl border border-white/10 bg-zinc-900 p-6 text-zinc-300 shadow-2xl">
+          Cargando acceso...
+        </div>
+      </MainLayout>
+    );
+  }
 
   return (
     <MainLayout>

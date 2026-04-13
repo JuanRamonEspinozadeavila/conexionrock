@@ -19,7 +19,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
   }, []);
 
   const dynamicColor = useMemo(() => {
-    if (!mounted || !currentTrack) return "from-zinc-900";
+    if (!mounted || !currentTrack) return "from-zinc-900/80";
     return getTrackColor(currentTrack.id);
   }, [mounted, currentTrack]);
 
@@ -34,11 +34,13 @@ export default function MainLayout({ children }: MainLayoutProps) {
 
         <main className="relative flex-1 overflow-y-auto overflow-x-hidden rounded-2xl bg-black">
           <div
-            className={`absolute inset-x-0 top-0 h-[320px] bg-gradient-to-b ${dynamicColor} to-transparent transition-all duration-700`}
+            className={`absolute inset-x-0 top-0 h-[420px] bg-gradient-to-b ${dynamicColor} via-transparent to-transparent transition-all duration-[1800ms] ease-out`}
           />
 
-          <div className="pointer-events-none absolute left-[-10%] top-[-10%] h-96 w-96 rounded-full bg-white/10 blur-3xl" />
-          <div className="pointer-events-none absolute right-[-10%] top-[20%] h-[400px] w-[400px] rounded-full bg-white/5 blur-3xl" />
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-[460px] bg-gradient-to-b from-white/5 via-transparent to-transparent opacity-60 transition-all duration-[2200ms] ease-out" />
+
+          <div className="pointer-events-none absolute left-[-10%] top-[-10%] h-96 w-96 rounded-full bg-white/10 blur-3xl transition-all duration-[2000ms] ease-out" />
+          <div className="pointer-events-none absolute right-[-10%] top-[20%] h-[400px] w-[400px] rounded-full bg-white/5 blur-3xl transition-all duration-[2000ms] ease-out" />
           <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-transparent via-black/40 to-black" />
 
           <div className="relative z-10 p-5 md:p-8">{children}</div>

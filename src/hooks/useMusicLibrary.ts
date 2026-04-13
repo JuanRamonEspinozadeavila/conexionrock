@@ -34,6 +34,19 @@ export function useMusicLibrary(options: Options = {}) {
     setErrorMessage("");
 
     try {
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser();
+
+      if (userError) {
+        setErrorMessage(`Error obteniendo usuario: ${userError.message}`);
+        setLoading(false);
+        return;
+      }
+
+      setUserId(user?.id ?? "");
+
       const { data: tracksData, error: tracksError } = await supabase
         .from("tracks")
         .select("*")
@@ -47,30 +60,11 @@ export function useMusicLibrary(options: Options = {}) {
 
       setTracks(((tracksData ?? []) as DbTrack[]).map(mapTrackToPlayerFormat));
 
-      if (!loadPlaylists) {
-        setLoading(false);
-        return;
-      }
-
-      const {
-        data: { user },
-        error: userError,
-      } = await supabase.auth.getUser();
-
-      if (userError) {
-        setErrorMessage(`Error obteniendo usuario: ${userError.message}`);
-        setLoading(false);
-        return;
-      }
-
-      if (!user) {
-        setUserId("");
+      if (!loadPlaylists || !user) {
         setPlaylists([]);
         setLoading(false);
         return;
       }
-
-      setUserId(user.id);
 
       const { data: playlistsData, error: playlistsError } = await supabase
         .from("playlists")
@@ -102,6 +96,7 @@ export function useMusicLibrary(options: Options = {}) {
       setPlaylists(
         ((playlistsData ?? []) as PlaylistWithRelations[]).map(mapPlaylistFromDb)
       );
+
       setLoading(false);
     } catch (error) {
       console.error("Error inesperado cargando librería:", error);

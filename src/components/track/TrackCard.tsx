@@ -66,12 +66,13 @@ export default function TrackCard({
   const isPlaylistContext = normalizedPlaylistId.length > 0;
   const isCurrentTrack = currentTrack?.id === track.id;
 
-  const showAddButton = !isPlaylistContext && !!onAddToPlaylist;
+  const canAddToPlaylist = !!onAddToPlaylist;
+const showAddButton = !isPlaylistContext && canAddToPlaylist;
   const showRemoveButton = isPlaylistContext && !!onRemoveFromPlaylist;
   const showMoveButtons = isPlaylistContext && (!!onMoveUp || !!onMoveDown);
 
   const playDisabled = !track.audioUrl?.trim();
-  const addDisabled = loadingAdd || !onAddToPlaylist;
+  const addDisabled = loadingAdd || !canAddToPlaylist;
   const removeDisabled =
     loadingRemove || !normalizedPlaylistId || !onRemoveFromPlaylist;
   const moveUpDisabled =

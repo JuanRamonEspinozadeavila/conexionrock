@@ -47,7 +47,8 @@ export default function TrackCard({
   const [loadingMoveDown, setLoadingMoveDown] = useState(false);
 
   const isPlaylistContext = !!playlistId;
-  const showAddButton = !isPlaylistContext && !!onAddToPlaylist;
+  const canAddToPlaylist = !!onAddToPlaylist;
+const showAddButton = !isPlaylistContext && canAddToPlaylist;
   const showRemoveButton = isPlaylistContext && !!onRemoveFromPlaylist;
   const showMoveButtons = isPlaylistContext && !!onMoveUp && !!onMoveDown;
 

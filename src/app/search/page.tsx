@@ -16,7 +16,7 @@ export default function SearchPage() {
     loading,
     errorMessage,
     setPlaylists,
-  } = useMusicLibrary({ loadPlaylists: true });
+} = useMusicLibrary({ loadPlaylists: false });
 
   const {
     toastMessage,
